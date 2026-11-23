@@ -48,9 +48,27 @@
 
       window.addEventListener('message', (event) => {
         if (event.source !== iframe.contentWindow) return;
-        if (!allowedBridgeOrigin.test(event.origin)) return;
 
         const payload = event.data;
+        const messageType = payload && payload.type ? payload.type : '(unknown)';
+        if (!allowedBridgeOrigin.test(event.origin)) {
+          showStatus(
+            'DIAGNOSTIK — Pesan diterima dari iframe, tetapi origin belum diizinkan.\\nOrigin: ' +
+            event.origin + '\\nTipe pesan: ' + messageType,
+            'err'
+          );
+          return;
+        }
+
+        if (messageType === 'REZA_SYSTEM_BRIDGE_READY') {
+          showStatus(
+            'IFRAME TERDETEKSI — AuthBridge mengirim sinyal READY.\\nOrigin: ' +
+            event.origin + '\\nSilakan klik Uji Koneksi Bridge.',
+            ''
+          );
+          return;
+        }
+
         if (!payload || payload.type !== 'REZA_SYSTEM_BRIDGE_RESPONSE') return;
         if (!pendingRequestId || payload.requestId !== pendingRequestId) return;
 
