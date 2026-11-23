@@ -9,7 +9,7 @@
 <body>
   <main>
     <h1>Reza System — Authentication Test</h1>
-    <p>Pengujian Firebase Google Sign-In pada repository terpisah. Tahap ini belum mengirim Firebase ID Token ke Apps Script dan belum mengubah database pengguna.</p>
+    <p>Pengujian Firebase Google Sign-In dan verifikasi Firebase ID Token melalui Apps Script. Belum membuat akun atau mengubah database.</p>
 
     <section>
       <h2>1. Firebase Google Sign-In</h2>
@@ -29,10 +29,17 @@
     </section>
 
     <section>
-      <h2>2. Apps Script Auth Bridge</h2>
-      <p class="note">Tes koneksi ini hanya mengirim permintaan ping. Tidak mengirim token Firebase.</p>
+      <h2>2. Koneksi Apps Script Auth Bridge</h2>
+      <p class="note">Ping hanya menguji koneksi dan tidak mengirim token.</p>
       <button id="bridgeButton" type="button" disabled>Menunggu AuthBridge...</button>
       <div id="bridgeStatus" class="status" role="status" aria-live="polite">Menunggu sinyal READY dari AuthBridge.</div>
+    </section>
+
+    <section>
+      <h2>3. Verifikasi Firebase ID Token</h2>
+      <p class="note">Token dikirim melalui postMessage ke AuthBridge lalu diverifikasi di Apps Script. Token tidak ditampilkan atau disimpan ke spreadsheet.</p>
+      <button id="verifyButton" type="button" disabled>Verifikasi Token ke Backend</button>
+      <div id="verifyStatus" class="status" role="status" aria-live="polite">Menunggu login dan AuthBridge siap.</div>
     </section>
   </main>
 
