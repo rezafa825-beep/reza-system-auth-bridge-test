@@ -37,8 +37,9 @@
       const button = document.getElementById('testButton');
       const statusBox = document.getElementById('status');
       const bridgeFrame = document.getElementById('authBridge');
-      // Google Apps Script may serve its HTML from a googleusercontent.com origin.
-      // Trust is additionally bound to this exact iframe's WindowProxy below.
+      // Apps Script HTML Service can run in a nested iframe, so its message
+      // source may not equal the outer iframe's contentWindow. We validate
+      // the expected Google origin, then pin the exact READY source for replies.
       const allowedBridgeOrigin = /^https:\/\/(script\.google\.com|[a-z0-9-]+-script\.googleusercontent\.com)$/;
       const expectedBridgeVersion = '0.1.2';
 
@@ -53,7 +54,7 @@
       }
 
       function isBridgeFrameMessage(event) {
-        return event.source === bridgeFrame.contentWindow &&
+        return event.source !== window &&
           allowedBridgeOrigin.test(event.origin);
       }
 
