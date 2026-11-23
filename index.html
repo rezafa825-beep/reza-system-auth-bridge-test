@@ -21,7 +21,7 @@
 <body>
   <main>
     <h1>Reza System — Auth Bridge Test</h1>
-    <p>Halaman ini hanya menguji komunikasi dasar antara GitHub Pages dan Google Apps Script. Belum melakukan login, mengirim token Firebase, atau mengubah database.</p>
+    <p>Halaman ini menguji komunikasi dasar antara GitHub Pages dan Google Apps Script. Belum melakukan login, mengirim token Firebase, atau mengubah database.</p>
     <button id="testButton" type="button" disabled>Menunggu AuthBridge…</button>
     <div id="status" role="status" aria-live="polite">Status: menunggu sinyal READY dari AuthBridge.</div>
   </main>
@@ -36,7 +36,11 @@
     (() => {
       const button = document.getElementById('testButton');
       const statusBox = document.getElementById('status');
-      const allowedBridgeOrigin = /^https:\/\/(script\.google\.com|[a-z0-9-]+\.googleusercontent\.com)$/;
+      const bridgeFrame = document.getElementById('authBridge');
+      // Google Apps Script may serve its HTML from a googleusercontent.com origin.
+      // Trust is additionally bound to this exact iframe's WindowProxy below.
+      const allowedBridgeOrigin = /^https:\/\/(script\.google\.com|[a-z0-9-]+-script\.googleusercontent\.com)$/;
+      const expectedBridgeVersion = '0.1.2';
 
       let bridgeWindow = null;
       let bridgeOrigin = null;
@@ -48,19 +52,33 @@
         statusBox.className = type || '';
       }
 
+      function isBridgeFrameMessage(event) {
+        return event.source === bridgeFrame.contentWindow &&
+          allowedBridgeOrigin.test(event.origin);
+      }
+
       window.addEventListener('message', (event) => {
         const payload = event.data;
         if (!payload || typeof payload !== 'object') return;
-        if (!allowedBridgeOrigin.test(event.origin)) return;
+        if (!isBridgeFrameMessage(event)) return;
 
         if (payload.type === 'REZA_SYSTEM_BRIDGE_READY') {
-          if (!event.source || typeof event.source.postMessage !== 'function') return;
+          if (payload.version !== expectedBridgeVersion) {
+            button.disabled = true;
+            showStatus(
+              'VERSI BRIDGE TIDAK SESUAI. Diharapkan ' + expectedBridgeVersion +
+              ', diterima ' + String(payload.version || 'tidak diketahui') + '.',
+              'err'
+            );
+            return;
+          }
           bridgeWindow = event.source;
           bridgeOrigin = event.origin;
           button.disabled = false;
           button.textContent = 'Uji Koneksi Bridge';
           showStatus(
-            'IFRAME TERDETEKSI — AuthBridge siap menerima permintaan.\nOrigin: ' + bridgeOrigin,
+            'IFRAME TERDETEKSI — AuthBridge siap menerima permintaan.\nVersi: ' +
+            payload.version + '\nOrigin: ' + bridgeOrigin,
             ''
           );
           return;
@@ -80,7 +98,7 @@
             result.status === 'READY') {
           showStatus(
             'BERHASIL — Bridge merespons.\nService: ' + result.service +
-            '\nVersi: ' + result.version +
+            '\nVersi backend: ' + result.version +
             '\nStatus: ' + result.status,
             'ok'
           );
