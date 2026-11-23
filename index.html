@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reza System — Auth Bridge Test</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, system-ui, Arial, sans-serif; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f3f5f9; color: #172033; }
+    main { width: min(640px, calc(100% - 40px)); padding: 32px; background: white; border: 1px solid #e4e8f0; border-radius: 18px; box-shadow: 0 12px 35px #17203312; }
+    h1 { margin: 0 0 8px; font-size: 25px; }
+    p { color: #596579; line-height: 1.6; }
+    button { border: 0; border-radius: 10px; padding: 12px 18px; background: #2457d6; color: white; font-weight: 650; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status { margin-top: 20px; padding: 14px; border-radius: 10px; background: #f1f4f8; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #status.ok { background: #eaf8ef; color: #176437; }
+    #status.err { background: #fff0ef; color: #9b2822; }
+    iframe { position: absolute; width: 1px; height: 1px; border: 0; left: -10px; bottom: -10px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Reza System — Auth Bridge Test</h1>
+    <p>Halaman ini hanya menguji komunikasi dasar antara GitHub Pages dan Google Apps Script. Belum melakukan login, mengirim token Firebase, atau mengubah database.</p>
+    <button id="testButton" type="button">Uji Koneksi Bridge</button>
+    <div id="status" role="status" aria-live="polite">Status: belum diuji.</div>
+  </main>
+
+  <iframe
+    id="authBridge"
+    title="Reza System Auth Bridge"
+    src="https://script.google.com/macros/s/AKfycbxZSe5dRSHUOUr4NSTEPkVlamn4uvmHYbNWJVH9R9-TMRVtb-xhu9NSyv38IYF9hq0/exec">
+  </iframe>
+
+  <script>
+    (() => {
+      const iframe = document.getElementById('authBridge');
+      const button = document.getElementById('testButton');
+      const statusBox = document.getElementById('status');
+      const allowedBridgeOrigin = /^https:\/\/(script\.google\.com|[a-z0-9-]+\.googleusercontent\.com)$/;
+      let pendingRequestId = null;
+      let timeoutId = null;
+
+      function showStatus(message, type) {
+        statusBox.textContent = message;
+        statusBox.className = type || '';
+      }
+
+      window.addEventListener('message', (event) => {
+        if (event.source !== iframe.contentWindow) return;
+        if (!allowedBridgeOrigin.test(event.origin)) return;
+
+        const payload = event.data;
+        if (!payload || payload.type !== 'REZA_SYSTEM_BRIDGE_RESPONSE') return;
+        if (!pendingRequestId || payload.requestId !== pendingRequestId) return;
+
+        clearTimeout(timeoutId);
+        pendingRequestId = null;
+        button.disabled = false;
+
+        const result = payload.result;
+        if (result && result.success === true &&
+            result.service === 'REZA_SYSTEM_AUTH_BRIDGE' &&
+            result.status === 'READY') {
+          showStatus(
+            'BERHASIL — Bridge merespons.\nService: ' + result.service +
+            '\nVersi: ' + result.version +
+            '\nStatus: ' + result.status,
+            'ok'
+          );
+        } else {
+          showStatus('Bridge merespons, tetapi format hasil tidak sesuai. Periksa implementasi AuthBridge.', 'err');
+        }
+      });
+
+      button.addEventListener('click', () => {
+        if (!iframe.contentWindow) {
+          showStatus('Iframe bridge belum tersedia. Muat ulang halaman lalu coba lagi.', 'err');
+          return;
+        }
+
+        clearTimeout(timeoutId);
+        pendingRequestId = 'bridge-test-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+        button.disabled = true;
+        showStatus('Menghubungi Google Apps Script Bridge…');
+
+        iframe.contentWindow.postMessage({
+          type: 'REZA_SYSTEM_BRIDGE_PING',
+          requestId: pendingRequestId
+        }, '*');
+
+        timeoutId = setTimeout(() => {
+          if (!pendingRequestId) return;
+          pendingRequestId = null;
+          button.disabled = false;
+          showStatus('TIMEOUT — Tidak ada respons dalam 15 detik. Periksa deployment Apps Script, URL iframe, dan listener AuthBridge.html.', 'err');
+        }, 15000);
+      });
+    })();
+  </script>
+</body>
+</html>
