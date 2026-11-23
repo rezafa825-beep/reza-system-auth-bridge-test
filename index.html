@@ -1,29 +1,39 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Reza System — Auth Bridge Test</title>
-  <style>
-    :root { color-scheme: light; font-family: Inter, system-ui, Arial, sans-serif; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f3f5f9; color: #172033; }
-    main { width: min(640px, calc(100% - 40px)); padding: 32px; background: white; border: 1px solid #e4e8f0; border-radius: 18px; box-shadow: 0 12px 35px #17203312; }
-    h1 { margin: 0 0 8px; font-size: 25px; }
-    p { color: #596579; line-height: 1.6; }
-    button { border: 0; border-radius: 10px; padding: 12px 18px; background: #2457d6; color: white; font-weight: 650; cursor: pointer; }
-    button:disabled { opacity: .55; cursor: wait; }
-    #status { margin-top: 20px; padding: 14px; border-radius: 10px; background: #f1f4f8; white-space: pre-wrap; overflow-wrap: anywhere; }
-    #status.ok { background: #eaf8ef; color: #176437; }
-    #status.err { background: #fff0ef; color: #9b2822; }
-    iframe { position: absolute; width: 1px; height: 1px; border: 0; left: -10px; bottom: -10px; }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f3f5f9">
+  <title>Reza System — Firebase Authentication Test</title>
 </head>
 <body>
   <main>
-    <h1>Reza System — Auth Bridge Test</h1>
-    <p>Halaman ini menguji komunikasi dasar antara GitHub Pages dan Google Apps Script. Belum melakukan login, mengirim token Firebase, atau mengubah database.</p>
-    <button id="testButton" type="button" disabled>Menunggu AuthBridge…</button>
-    <div id="status" role="status" aria-live="polite">Status: menunggu sinyal READY dari AuthBridge.</div>
+    <h1>Reza System — Authentication Test</h1>
+    <p>Pengujian Firebase Google Sign-In pada repository terpisah. Tahap ini belum mengirim Firebase ID Token ke Apps Script dan belum mengubah database pengguna.</p>
+
+    <section>
+      <h2>1. Firebase Google Sign-In</h2>
+      <div class="actions">
+        <button id="loginButton" type="button">Login dengan Google</button>
+        <button id="logoutButton" class="secondary" type="button" disabled>Logout</button>
+      </div>
+      <div id="authStatus" class="status" role="status" aria-live="polite">Memeriksa status Firebase Authentication...</div>
+      <div id="userPanel" class="status" hidden>
+        <div class="user-grid">
+          <strong>Nama</strong><span id="userName"></span>
+          <strong>Email</strong><span id="userEmail"></span>
+          <strong>UID</strong><span id="userUid"></span>
+        </div>
+      </div>
+      <div id="tokenStatus" class="status note">Belum ada Firebase ID Token.</div>
+    </section>
+
+    <section>
+      <h2>2. Apps Script Auth Bridge</h2>
+      <p class="note">Tes koneksi ini hanya mengirim permintaan ping. Tidak mengirim token Firebase.</p>
+      <button id="bridgeButton" type="button" disabled>Menunggu AuthBridge...</button>
+      <div id="bridgeStatus" class="status" role="status" aria-live="polite">Menunggu sinyal READY dari AuthBridge.</div>
+    </section>
   </main>
 
   <iframe
@@ -32,113 +42,6 @@
     src="https://script.google.com/macros/s/AKfycbxZSe5dRSHUOUr4NSTEPkVlamn4uvmHYbNWJVH9R9-TMRVtb-xhu9NSyv38IYF9hq0/exec">
   </iframe>
 
-  <script>
-    (() => {
-      const button = document.getElementById('testButton');
-      const statusBox = document.getElementById('status');
-      const bridgeFrame = document.getElementById('authBridge');
-      // Apps Script HTML Service can run in a nested iframe, so its message
-      // source may not equal the outer iframe's contentWindow. We validate
-      // the expected Google origin, then pin the exact READY source for replies.
-      const allowedBridgeOrigin = /^https:\/\/(script\.google\.com|[a-z0-9-]+-script\.googleusercontent\.com)$/;
-      const expectedBridgeVersion = '0.1.2';
-
-      let bridgeWindow = null;
-      let bridgeOrigin = null;
-      let pendingRequestId = null;
-      let timeoutId = null;
-
-      function showStatus(message, type) {
-        statusBox.textContent = message;
-        statusBox.className = type || '';
-      }
-
-      function isBridgeFrameMessage(event) {
-        return event.source !== window &&
-          allowedBridgeOrigin.test(event.origin);
-      }
-
-      window.addEventListener('message', (event) => {
-        const payload = event.data;
-        if (!payload || typeof payload !== 'object') return;
-        if (!isBridgeFrameMessage(event)) return;
-
-        if (payload.type === 'REZA_SYSTEM_BRIDGE_READY') {
-          if (payload.version !== expectedBridgeVersion) {
-            button.disabled = true;
-            showStatus(
-              'VERSI BRIDGE TIDAK SESUAI. Diharapkan ' + expectedBridgeVersion +
-              ', diterima ' + String(payload.version || 'tidak diketahui') + '.',
-              'err'
-            );
-            return;
-          }
-          bridgeWindow = event.source;
-          bridgeOrigin = event.origin;
-          button.disabled = false;
-          button.textContent = 'Uji Koneksi Bridge';
-          showStatus(
-            'IFRAME TERDETEKSI — AuthBridge siap menerima permintaan.\nVersi: ' +
-            payload.version + '\nOrigin: ' + bridgeOrigin,
-            ''
-          );
-          return;
-        }
-
-        if (payload.type !== 'REZA_SYSTEM_BRIDGE_RESPONSE') return;
-        if (event.source !== bridgeWindow || event.origin !== bridgeOrigin) return;
-        if (!pendingRequestId || payload.requestId !== pendingRequestId) return;
-
-        clearTimeout(timeoutId);
-        pendingRequestId = null;
-        button.disabled = false;
-
-        const result = payload.result;
-        if (result && result.success === true &&
-            result.service === 'REZA_SYSTEM_AUTH_BRIDGE' &&
-            result.status === 'READY') {
-          showStatus(
-            'BERHASIL — Bridge merespons.\nService: ' + result.service +
-            '\nVersi backend: ' + result.version +
-            '\nStatus: ' + result.status,
-            'ok'
-          );
-        } else {
-          showStatus(
-            'Bridge merespons, tetapi hasil tidak sesuai.\n' +
-            JSON.stringify(result || payload, null, 2),
-            'err'
-          );
-        }
-      });
-
-      button.addEventListener('click', () => {
-        if (!bridgeWindow || !bridgeOrigin) {
-          showStatus('AuthBridge belum mengirim sinyal READY. Muat ulang halaman dan periksa deployment Apps Script.', 'err');
-          return;
-        }
-
-        clearTimeout(timeoutId);
-        pendingRequestId = 'bridge-test-' + Date.now() + '-' + Math.random().toString(16).slice(2);
-        button.disabled = true;
-        showStatus('Menghubungi Google Apps Script Bridge…');
-
-        bridgeWindow.postMessage({
-          type: 'REZA_SYSTEM_BRIDGE_PING',
-          requestId: pendingRequestId
-        }, bridgeOrigin);
-
-        timeoutId = setTimeout(() => {
-          if (!pendingRequestId) return;
-          pendingRequestId = null;
-          button.disabled = false;
-          showStatus(
-            'TIMEOUT — AuthBridge tidak mengirim respons. Periksa daftar Eksekusi Apps Script untuk melihat apakah bridgePing dijalankan.',
-            'err'
-          );
-        }, 15000);
-      });
-    })();
-  </script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
